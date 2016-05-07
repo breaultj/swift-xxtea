@@ -1,0 +1,98 @@
+//: XXTEA impplemention using Apple's Swift language
+//: Author: James Breault
+//: Date: 2016/05/07
+
+import Cocoa
+
+// XXTEA
+let XXTEA_DELTA : UInt32 = 0x9e3779b9
+
+func xxteaMX(z : UInt32, y : UInt32, sum : UInt32, p : Int, e : UInt32, key : [UInt32] ) -> UInt32 {
+    //#define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
+    let p1 : UInt32 = (z>>5^y<<2)
+    let p2 : UInt32 = (y>>3^z<<4)
+    
+    let s1 : UInt32 = (sum^y)
+    let i : Int = (p&3) ^ Int(e)
+    let k1 : UInt32 = (key[i] ^ z)
+    
+    let pp = p1 &+ p2
+    let sk = s1 &+ k1
+    
+    return (pp ^ sk)
+}
+
+func xxteaEncrypt(plainValue : [UInt32], k : [UInt32]) -> [UInt32] {
+    let n : Int = plainValue.count
+    var y : UInt32 = 0
+    var z : UInt32
+    var sum : UInt32 = 0
+    let rounds : Int = 6 + (52/n)
+    var e : UInt32 = 0
+    var v : [UInt32] = plainValue
+    let pValue = n - 1
+    
+    z = v[n-1]
+    for _ in 0..<rounds {
+
+        sum = sum &+ XXTEA_DELTA
+        e = (sum >> 2) & 3;
+        
+        for p in 0..<n-1 {
+            y = v[p+1]
+            v[p] = v[p] &+ xxteaMX(z, y: y, sum: sum, p: p, e: e, key: k)
+            z = v[p]
+        }
+        
+        y = v[0]
+        v[n-1] = v[n-1] &+ xxteaMX(z, y: y, sum: sum, p: pValue, e: e, key: k)
+        z = v[n-1]
+    }
+    
+    return v
+}
+
+func xxteaDecrypt(encryptedValue : [UInt32], k : [UInt32]) -> [UInt32] {
+    let n : Int = encryptedValue.count
+    let rounds : Int = 6 + 52/n
+    var sum : UInt32 = 0
+    var v : [UInt32] = encryptedValue
+    var y : UInt32 = 0
+    var z : UInt32
+    var e : UInt32 = 0
+    let pValue = 0
+    
+    sum = UInt32(rounds) &* XXTEA_DELTA;
+    y = v[0];
+    for _ in 0 ..< rounds {
+        e = (sum >> 2) & 3
+        
+        for p in (1...n-1).reverse() {
+            p
+            z = v[p-1]
+            v[p] =  v[p] &- xxteaMX(z, y: y, sum: sum, p: p, e: e, key: k)
+            y = v[p]
+        }
+        
+        z = v[n-1]
+        v[0] = v[0] &- xxteaMX(z, y: y, sum: sum, p: pValue, e: e, key: k)
+        y = v[0]
+        sum = sum &- XXTEA_DELTA;
+    }
+    
+    return v
+}
+
+// define the key values
+var keys : [UInt32] = [ 4734734,284734,2382323,234234]
+
+// test One
+var plaintext : [UInt32] = [ 4282209818, 3506380122 ]
+var e : [UInt32] = xxteaEncrypt(plaintext, k: keys)
+var plain : [UInt32] = xxteaDecrypt(e, k: keys)
+
+// test Two
+var plaintext2 : [UInt32] = [ 4282209818, 3506380122 , 38383838, 875949484]
+var encrypted2 : [UInt32] = xxteaEncrypt(plaintext2, k: keys)
+var plain2 : [UInt32] = xxteaDecrypt(encrypted2, k: keys)
+
